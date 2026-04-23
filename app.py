@@ -41,55 +41,27 @@ for message in st.session_state.messages:
 
 # 6. User Input & AI Response
 if prompt := st.chat_input("How are you feeling?"):
-    # Show user message
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Generate Response
     with st.chat_message("assistant"):
-        # STEP A: THE EMOTION ROUTER
-        # We ask Gemini to categorize the student's problem first
-        router_prompt = f"""
-        Analyze this student's message: "{prompt}"
-        Classify it into exactly one of these 4 categories:
-        1. ACADEMIC (Exams, Results, Study pressure)
-        2. SOCIAL (Peer pressure, Parents, Loneliness, Comparison)
-        3. REGULATORY (Burnout, Sleep issues, Brain fog, Exhaustion)
-        4. SECURITY (Money, Loans, Placement, Career fear, Future stability)
-        Respond with ONLY the category name.
-        """
+        # This part makes the AI 'think' instead of repeating
+        router_prompt = f"Identify the emotion: ACADEMIC, SOCIAL, REGULATORY, or SECURITY. Text: {prompt}"
+        category = llm.invoke(router_prompt).content.strip().upper()
+
+        mapping = {
+            "ACADEMIC": "Gita (Nishkama Karma) - Focus on effort.",
+            "SOCIAL": "Hanuman - Inner strength.",
+            "REGULATORY": "Samudra Manthan - Need for rest.",
+            "SECURITY": "Sudama & Krishna - Values over money."
+        }
+        myth_context = mapping.get(category, "General empathy.")
+
+        # This generates a NEW, unique response every time
+        response = llm.invoke(f"As ManoSetu AI, help this student using {myth_context}: {prompt}").content
         
-        try:
-            category_result = llm.invoke(router_prompt).content.strip().upper()
-            
-            # STEP B: ASSIGN MYTHOLOGICAL CONTEXT
-            if "SECURITY" in category_result:
-                myth_context = "Talk about Sudama and Krishna. Emphasize that worth is not wealth, and character brings sustenance."
-            elif "ACADEMIC" in category_result:
-                myth_context = "Use the Bhagavad Gita's 'Nishkama Karma'. Focus on the effort, not the exam result."
-            elif "SOCIAL" in category_result:
-                myth_context = "Mention Hanuman and Jamvant. Remind them of their inner strength that is often hidden by comparison."
-            elif "REGULATORY" in category_result:
-                myth_context = "Refer to the Samudra Manthan. Explain that rest is needed when the 'churning' of life gets intense."
-            else:
-                myth_context = "Provide general empathetic mythological guidance."
+        st.caption(f"Mapped to: {category}")
+        st.markdown(response)
 
-            # STEP C: GENERATE FINAL RESPONSE
-            final_messages = [
-                SystemMessage(content=system_prompt + f"\nSpecific Context for this session: {myth_context}"),
-                HumanMessage(content=prompt)
-            ]
-            
-            response = llm.invoke(final_messages)
-            full_response = response.content
-            
-            # Optional: Display the recognized category to the student
-            st.caption(f"Topic: {category_result}")
-            st.markdown(full_response)
-            
-        except Exception as e:
-            st.error("Something went wrong with the AI brain. Please try again.")
-            full_response = "I am here for you, but I'm having trouble connecting right now."
-
-    st.session_state.messages.append({"role": "assistant", "content": full_response})
+    st.session_state.messages.append({"role": "assistant", "content": response})
